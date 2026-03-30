@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>點擊圖層測試</title>
   <style>
     body {
@@ -16,14 +16,16 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      gap: 30px;
+      gap: 20px;
       margin: 20px auto;
-      padding: 0 20px;
+      padding: 0 10px;
+      max-width: 100%;
     }
     .stage {
       position: relative;
-      width: 650px;
-      height: 850px;
+      width: 100%;
+      max-width: 650px;
+      aspect-ratio: 650 / 850;
       border: 5px solid #ff0066;
       border-radius: 15px;
       overflow: hidden;
@@ -32,6 +34,7 @@
       box-shadow: 0 0 40px rgba(255,0,102,0.6);
       user-select: none;
       -webkit-user-select: none;
+      touch-action: none;
     }
     .control-panel {
       display: flex;
@@ -44,14 +47,14 @@
       border: 5px solid #ff0066;
       border-radius: 20px;
       box-shadow: 0 0 40px rgba(255,0,102,0.6);
-      min-width: 180px;
+      min-width: 160px;
       height: 280px;
       position: relative;
       top: 30px;
     }
     #insertBtn {
-      padding: 22px 40px;
-      font-size: 28px;
+      padding: 18px 35px;
+      font-size: 24px;
       font-weight: bold;
       background: linear-gradient(145deg, #ff3399, #cc0066);
       color: #fff;
@@ -61,7 +64,7 @@
       box-shadow: 0 10px 25px rgba(255,51,153,0.5);
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       user-select: none;
-      min-width: 160px;
+      min-width: 150px;
       letter-spacing: 2px;
     }
     #insertBtn:hover {
@@ -210,10 +213,10 @@
     const oneTimeLayer = createLayer(groupBase, "one_time_layer.png", 35, 0);
     
     // ===== 血液圖層 =====
-    const blood01 = createLayer(groupBase, "blood_01.png", 36, 0);  // zone 之下
-    const blood02 = createLayer(groupBase, "blood_02.png", 37, 0);  // zone 之下
-    const blood03 = createLayer(groupBase, "blood_03.png", 41, 0);  // zone 上方（拔出後使用）
-    const blood04 = createLayer(groupBase, "blood_04.png", 42, 0);  // zone 上方（拔出後使用）
+    const blood01 = createLayer(groupBase, "blood_01.png", 36, 0);
+    const blood02 = createLayer(groupBase, "blood_02.png", 37, 0);
+    const blood03 = createLayer(groupBase, "blood_03.png", 41, 0);
+    const blood04 = createLayer(groupBase, "blood_04.png", 42, 0);
 
     const layer2 = createLayer(groupBase, "layer_02.png", 34, 0);
     const layer3 = createLayer(groupBase, "layer_03.png", 33, 0);
@@ -331,11 +334,9 @@
       sideRightFx.style.opacity = "1";
       sideLeftFx.style.opacity = "1";
 
-      // 處女膜：只在第一次插入時出現，之後永久消失
       oneTimeLayer.style.opacity = oneTimeLayerPlayed ? "0" : "1";
       layer2.style.opacity = "1";
 
-      // layer3~7 不要在 reset 時全開
       layer3.style.opacity = "1";
       layer4.style.opacity = "1";
       layer5.style.opacity = "1";
@@ -463,21 +464,18 @@
       resetSpaceOnionState();
       await nextPaint(2);
 
-      // 1. zone 左右淡出 0.1s
       zoneRight.style.transition = "opacity 0.1s linear";
       zoneLeft.style.transition = "opacity 0.1s linear";
       zoneRight.style.opacity = "0";
       zoneLeft.style.opacity = "0";
       await sleep(100);
 
-      // 2. side 左右淡出 0.1s
       sideRightFx.style.transition = "opacity 0.1s linear";
       sideLeftFx.style.transition = "opacity 0.1s linear";
       sideRightFx.style.opacity = "0";
       sideLeftFx.style.opacity = "0";
       await sleep(100);
 
-      // 3. one_time_layer & layer_02 同時出現 → 立即停止
       oneTimeLayer.style.transition = "none";
       layer2.style.transition = "none";
       oneTimeLayer.style.opacity = oneTimeLayerPlayed ? "0" : "1";
@@ -500,7 +498,6 @@
         await sleep(400);
         oneTimeLayerPlayed = true;
 
-        // ===== 處女膜破壞時伴隨血液效果（只執行一次，常駐不會消失）=====
         blood01.style.transition = "opacity 0.5s ease-in";
         blood01.style.opacity = "1";
         await sleep(500);
@@ -582,7 +579,6 @@
       sideRightFx.style.display = "block";
       sideLeftFx.style.display = "block";
 
-      // 從當前圖層完整倒放回初始 zone
       const fullBackwardLayers = [layer7, layer6, layer5, layer4, layer3, layer2];
       for (const layer of fullBackwardLayers) {
         layer.style.transition = "opacity 0.2s linear";
@@ -590,24 +586,20 @@
         await sleep(200);
       }
 
-      // side 左右淡入 0.1s
       sideRightFx.style.transition = "opacity 0.1s linear";
       sideLeftFx.style.transition = "opacity 0.1s linear";
       sideRightFx.style.opacity = "1";
       sideLeftFx.style.opacity = "1";
       await sleep(100);
 
-      // zone 左右淡入 0.1s
       zoneRight.style.transition = "opacity 0.1s linear";
       zoneLeft.style.transition = "opacity 0.1s linear";
       zoneRight.style.opacity = "1";
       zoneLeft.style.opacity = "1";
       await sleep(100);
 
-      // 回待機狀態（處女膜已永久消失）
       resetSpaceOnionState();
 
-      // ===== 拔出動畫播放完後，blood_03 和 blood_04 在 zone 上方淡入（常駐）=====
       blood03.style.transition = "opacity 0.5s ease-in";
       blood03.style.opacity = "1";
       await sleep(500);
@@ -889,6 +881,37 @@
     setInterval(() => {
       if (Math.random() < 0.6) doBlink();
     }, 2600);
+
+    // ===== 手機觸控支援 =====
+    function getTouchPos(e) {
+      const rect = stage.getBoundingClientRect();
+      return {
+        clientX: e.touches[0].clientX,
+        clientY: e.touches[0].clientY
+      };
+    }
+
+    stage.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) {
+        const pos = getTouchPos(e);
+        const fakeEvent = { 
+          clientX: pos.clientX, 
+          clientY: pos.clientY,
+          offsetX: pos.clientX - stage.getBoundingClientRect().left,
+          offsetY: pos.clientY - stage.getBoundingClientRect().top 
+        };
+        stage.dispatchEvent(new MouseEvent('mousedown', fakeEvent));
+      }
+    });
+
+    stage.addEventListener('touchend', () => {
+      stage.dispatchEvent(new MouseEvent('mouseup'));
+    });
+
+    stage.addEventListener('touchmove', e => {
+      if (e.touches.length === 1) e.preventDefault();
+    });
+
     // ===== 初始化 =====
     updateAll();
     releasePress();
