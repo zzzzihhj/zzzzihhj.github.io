@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>抽插模擬器</title>
+  <title>點擊圖層測試</title>
   <style>
     body {
       margin: 0;
@@ -14,7 +14,7 @@
     }
     .container {
       display: flex;
-      flex-direction: column;        /* 手機改成垂直排列 */
+      flex-direction: column;
       align-items: center;
       gap: 15px;
       margin: 20px auto;
@@ -130,7 +130,7 @@
   </style>
 </head>
 <body>
-  <h1>抽插模擬器</h1>
+  <h1>點擊圖層測試</h1>
   
   <div class="container">
     <!-- 原有舞台 -->
@@ -151,7 +151,7 @@
   </div>
 
   <script>
-    /* 你原本的所有 JavaScript 程式碼（完全保留） */
+    // 你原本提供的完整程式碼（全部保留）
     const stage = document.getElementById('stage');
     const statusEl = document.getElementById('status');
     const groupBase = document.getElementById('groupBase');
@@ -169,16 +169,20 @@
     let stockingsRemoved = false;
     let pussyProgress = 0;
     let braBusy = false;
+    // generic press
     let isPressing = false;
     let pressRunning = false;
+    // 進階互動
     let sidePressBusy = false;
     let forwardBusy = false;
     let backwardBusy = false;
     let oneTimeLayerPlayed = false;
     let interactionUnlocked = false;
+    // 左右 zone 長按狀態
     let holdingSideRight = false;
     let holdingSideLeft = false;
 
+    // ===== 三階段控制 + 確定後循環 =====
     let animationPhase = 0;
     let isLooping = false;
     let confirmPrepared = false;
@@ -194,10 +198,689 @@
       parent.appendChild(img);
       return img;
     }
+    // ===== 基礎圖層 =====
+    const nudeBase = createLayer(groupBase, "nude_base.png", 1, 1);
+    const bellyInhale = createLayer(groupBase, "belly_inhale.png", 2, 0);
+    const legsBase = createLayer(groupBase, "legs_base.png", 3, 1);
+    const pussyImg = createLayer(groupBase, "pussy_00_hymen.png", 4, 0);
+    // ===== 中性互動圖層 =====
+    const zoneRight = createLayer(groupBase, "zone_right.png", 40, 1);
+    const zoneLeft = createLayer(groupBase, "zone_left.png", 39, 1);
+    const topCover = createLayer(groupBase, "top_cover.png", 38, 1);
+    const sideRightFx = createLayer(groupBase, "side_right_fx.png", 37, 1);
+    const sideLeftFx = createLayer(groupBase, "side_left_fx.png", 36, 1);
+    const oneTimeLayer = createLayer(groupBase, "one_time_layer.png", 35, 0);
+    
+    // ===== 血液圖層 =====
+    const blood01 = createLayer(groupBase, "blood_01.png", 36, 0);
+    const blood02 = createLayer(groupBase, "blood_02.png", 37, 0);
+    const blood03 = createLayer(groupBase, "blood_03.png", 41, 0);
+    const blood04 = createLayer(groupBase, "blood_04.png", 42, 0);
 
-    // 以下所有圖層、函數、邏輯與你提供的版本完全相同
-    // （為了節省篇幅，這裡省略了中間的 createLayer 與所有 function）
-    // 但實際上已全部包含在你原本的程式碼中，你只要把上面這份完整貼上即可
+    const layer2 = createLayer(groupBase, "layer_02.png", 34, 0);
+    const layer3 = createLayer(groupBase, "layer_03.png", 33, 0);
+    const layer4 = createLayer(groupBase, "layer_04.png", 32, 0);
+    const layer5 = createLayer(groupBase, "layer_05.png", 31, 0);
+    const layer6 = createLayer(groupBase, "layer_06.png", 30, 0);
+    const layer7 = createLayer(groupBase, "layer_07.png", 29, 0);
+    // generic press zone / frames
+    const pressHit = createLayer(groupBase, "press_00.png", 5, 1);
+    const pressSmall = createLayer(groupBase, "press_small.png", 6, 0);
+    const pressMid = createLayer(groupBase, "press_mid.png", 7, 0);
+    const pressBig = createLayer(groupBase, "press_big.png", 8, 0);
+    // ===== 中層互動圖層 =====
+    const stockingsImg = createLayer(groupMid, "stockings_00.png", 1, 1);
+    const socksImg = createLayer(groupMid, "socks_00.png", 2, 1);
+    const pantiesImg = createLayer(groupMid, pantiesList[0], 3, 1);
+    // bra 雙圖層
+    const braA = createLayer(groupMid, braList[0], 4, 1);
+    const braB = createLayer(groupMid, braList[0], 5, 0);
+    let braFront = braA;
+    let braBack = braB;
+    // ===== 最上層 =====
+    const hair = createLayer(groupTop, "hair.png", 1, 1);
+    const faceNeutral = createLayer(groupTop, "face_neutral.png", 2, 1);
+    const eyeClosed = createLayer(groupTop, "eye_closed.png", 3, 0);
+    const hairFront = createLayer(groupTop, "hair_front.png", 4, 1);
+    // ===== Canvas 快取 =====
+    const canvases = new Map();
+    function canvasKey(img) {
+      return img.currentSrc || img.src;
+    }
+    function clearCanvas(img) {
+      canvases.delete(canvasKey(img));
+    }
+    function getCanvas(img) {
+      const key = canvasKey(img);
+      if (canvases.has(key)) return canvases.get(key);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      canvases.set(key, canvas);
+      return canvas;
+    }
+    // ===== hit 判定 =====
+    function isHit(img, clientX, clientY, alphaThreshold = 80) {
+      if (!img) return false;
+      if (img.style.display === "none") return false;
+      if (img.style.opacity === "0") return false;
+      if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return false;
+      const rect = img.getBoundingClientRect();
+      const x = Math.floor((clientX - rect.left) * (img.naturalWidth / rect.width));
+      const y = Math.floor((clientY - rect.top) * (img.naturalHeight / rect.height));
+      if (x < 0 || y < 0 || x >= img.naturalWidth || y >= img.naturalHeight) return false;
+      try {
+        const canvas = getCanvas(img);
+        const data = canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+        return data[3] > alphaThreshold;
+      } catch {
+        return false;
+      }
+    }
+    function isPressHit(clientX, clientY) {
+      return isHit(pressHit, clientX, clientY, 10);
+    }
+    // ===== 圖片預載與 decode =====
+    async function preloadAndDecode(src) {
+      const img = new Image();
+      img.src = src;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      if (img.decode) {
+        try { await img.decode(); } catch {}
+      }
+      return img;
+    }
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ===== 動畫輔助 =====
+    function nextFrame() {
+      return new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    async function nextPaint(frames = 2) {
+      for (let i = 0; i < frames; i++) {
+        await nextFrame();
+      }
+    }
+
+    // ===== 洋蔥皮重置（處女膜專用處理）=====
+    function resetSpaceOnionState() {
+      zoneRight.style.display = "block";
+      zoneLeft.style.display = "block";
+      sideRightFx.style.display = "block";
+      sideLeftFx.style.display = "block";
+
+      zoneRight.style.transition = "none";
+      zoneLeft.style.transition = "none";
+      sideRightFx.style.transition = "none";
+      sideLeftFx.style.transition = "none";
+      oneTimeLayer.style.transition = "none";
+      layer2.style.transition = "none";
+      layer3.style.transition = "none";
+      layer4.style.transition = "none";
+      layer5.style.transition = "none";
+      layer6.style.transition = "none";
+      layer7.style.transition = "none";
+
+      zoneRight.style.opacity = "1";
+      zoneLeft.style.opacity = "1";
+      sideRightFx.style.opacity = "1";
+      sideLeftFx.style.opacity = "1";
+
+      oneTimeLayer.style.opacity = oneTimeLayerPlayed ? "0" : "1";
+      layer2.style.opacity = "1";
+
+      layer3.style.opacity = "1";
+      layer4.style.opacity = "1";
+      layer5.style.opacity = "1";
+      layer6.style.opacity = "1";
+      layer7.style.opacity = "1";
+
+      void stage.offsetHeight;
+    }
+
+    function resetSideHoldState() {
+      zoneRight.style.transition = "none";
+      zoneLeft.style.transition = "none";
+      sideRightFx.style.transition = "none";
+      sideLeftFx.style.transition = "none";
+      oneTimeLayer.style.transition = "none";
+      layer2.style.transition = "none";
+
+      zoneRight.style.opacity = "1";
+      zoneLeft.style.opacity = "1";
+      sideRightFx.style.opacity = "1";
+      sideLeftFx.style.opacity = "1";
+
+      oneTimeLayer.style.opacity = "0";
+      layer2.style.opacity = "0";
+
+      void stage.offsetHeight;
+    }
+
+    // ===== 進階互動控制 =====
+    function unlockAdvancedInteraction() {
+      interactionUnlocked = true;
+      statusEl.textContent = "已解鎖進階互動";
+      topCover.style.opacity = "0";
+
+      layer3.style.opacity = "0";
+      layer4.style.opacity = "0";
+      layer5.style.opacity = "0";
+      layer6.style.opacity = "0";
+      layer7.style.opacity = "0";
+
+      resetSideHoldState();
+      resetSpaceOnionState();
+    }
+    function canUseAdvancedInteraction() {
+      return interactionUnlocked;
+    }
+
+    // ===== 左右 zone 長按互動 =====
+    async function playSideHoldForward(side) {
+      if (sidePressBusy) return;
+      sidePressBusy = true;
+
+      const zone = side === 'right' ? zoneRight : zoneLeft;
+      const fx = side === 'right' ? sideRightFx : sideLeftFx;
+      const isHolding = () => side === 'right' ? holdingSideRight : holdingSideLeft;
+
+      resetSideHoldState();
+      await sleep(20);
+
+      if (!isHolding()) {
+        sidePressBusy = false;
+        return;
+      }
+
+      zone.style.transition = "opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
+      zone.style.opacity = "0";
+      await sleep(200);
+
+      if (!isHolding()) {
+        sidePressBusy = false;
+        return;
+      }
+
+      oneTimeLayer.style.transition = "none";
+      layer2.style.transition = "none";
+      oneTimeLayer.style.opacity = "1";
+      layer2.style.opacity = "1";
+
+      await sleep(20);
+
+      if (!isHolding()) {
+        sidePressBusy = false;
+        return;
+      }
+
+      fx.style.transition = "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+      fx.style.opacity = "0";
+      await sleep(300);
+
+      sidePressBusy = false;
+    }
+
+    async function playSideHoldBackward(side) {
+      const zone = side === 'right' ? zoneRight : zoneLeft;
+      const fx = side === 'right' ? sideRightFx : sideLeftFx;
+
+      fx.style.transition = "opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1)";
+      fx.style.opacity = "1";
+      await sleep(100);
+
+      zone.style.transition = "opacity 0.05s cubic-bezier(0.4, 0, 0.2, 1)";
+      zone.style.opacity = "1";
+      await sleep(50);
+
+      oneTimeLayer.style.transition = "opacity 0.05s cubic-bezier(0.4, 0, 0.2, 1)";
+      layer2.style.transition = "opacity 0.05s cubic-bezier(0.4, 0, 0.2, 1)";
+      oneTimeLayer.style.opacity = "0";
+      layer2.style.opacity = "0";
+      await sleep(50);
+
+      sidePressBusy = false;
+    }
+
+    // ===== 階段1：插入 → 只做到 one_time_layer + layer_02 同時出現並停止 =====
+    async function playStage1Forward() {
+      if (forwardBusy || backwardBusy || !canUseAdvancedInteraction() || animationPhase !== 0) return;
+
+      forwardBusy = true;
+
+      zoneRight.style.display = "block";
+      zoneLeft.style.display = "block";
+      sideRightFx.style.display = "block";
+      sideLeftFx.style.display = "block";
+
+      resetSpaceOnionState();
+      await nextPaint(2);
+
+      zoneRight.style.transition = "opacity 0.1s linear";
+      zoneLeft.style.transition = "opacity 0.1s linear";
+      zoneRight.style.opacity = "0";
+      zoneLeft.style.opacity = "0";
+      await sleep(100);
+
+      sideRightFx.style.transition = "opacity 0.1s linear";
+      sideLeftFx.style.transition = "opacity 0.1s linear";
+      sideRightFx.style.opacity = "0";
+      sideLeftFx.style.opacity = "0";
+      await sleep(100);
+
+      oneTimeLayer.style.transition = "none";
+      layer2.style.transition = "none";
+      oneTimeLayer.style.opacity = oneTimeLayerPlayed ? "0" : "1";
+      layer2.style.opacity = "1";
+      await sleep(20);
+
+      forwardBusy = false;
+      animationPhase = 1;
+      updateButton();
+    }
+
+    // ===== 前處理（只跑一次） =====
+    async function prepareConfirm() {
+      if (confirmPrepared) return;
+      confirmPrepared = true;
+
+      if (!oneTimeLayerPlayed) {
+        oneTimeLayer.style.transition = "opacity 0.4s linear";
+        oneTimeLayer.style.opacity = "0";
+        await sleep(400);
+        oneTimeLayerPlayed = true;
+
+        blood01.style.transition = "opacity 0.5s ease-in";
+        blood01.style.opacity = "1";
+        await sleep(500);
+
+        blood02.style.transition = "opacity 0.5s ease-in";
+        blood02.style.opacity = "1";
+        await sleep(500);
+      }
+
+      layer2.style.transition = "opacity 0.1s linear";
+      layer2.style.opacity = "0";
+      await sleep(100);
+
+      layer3.style.transition = "opacity 0.1s linear";
+      layer3.style.opacity = "0";
+      await sleep(100);
+
+      zoneRight.style.display = "none";
+      zoneLeft.style.display = "none";
+      sideRightFx.style.display = "none";
+      sideLeftFx.style.display = "none";
+    }
+
+    // ===== 純 forward（只跑 4~6，layer7 保持可見） =====
+    async function playForward4to7() {
+      const layers = [layer4, layer5, layer6];
+
+      for (const layer of layers) {
+        layer.style.transition = "opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1)";
+        layer.style.opacity = "0";
+        await sleep(280);
+      }
+
+      layer7.style.transition = "none";
+      layer7.style.opacity = "1";
+    }
+
+    // ===== 確定後的倒放序列（速度一致） =====
+    async function playBackward7to4() {
+      const layers = [layer7, layer6, layer5, layer4];
+
+      for (const layer of layers) {
+        layer.style.transition = "opacity 0.28s cubic-bezier(0.25, 0.1, 0.25, 1)";
+        layer.style.opacity = "1";
+        await sleep(280);
+      }
+    }
+
+    // ===== 確定後的無限循環 =====
+    async function startConfirmLoop() {
+      if (isLooping) return;
+      isLooping = true;
+
+      confirmPrepared = false;
+
+      await prepareConfirm();
+
+      while (isLooping) {
+        await playForward4to7();
+
+        if (!isLooping) break;
+
+        await sleep(15);
+
+        await playBackward7to4();
+      }
+    }
+
+    // ===== 拔出：立刻停止循環並完整倒放回 zone =====
+    async function playBackwardSequence() {
+      if (backwardBusy) return;
+
+      backwardBusy = true;
+      isLooping = false;
+      confirmPrepared = false;
+
+      zoneRight.style.display = "block";
+      zoneLeft.style.display = "block";
+      sideRightFx.style.display = "block";
+      sideLeftFx.style.display = "block";
+
+      const fullBackwardLayers = [layer7, layer6, layer5, layer4, layer3, layer2];
+      for (const layer of fullBackwardLayers) {
+        layer.style.transition = "opacity 0.2s linear";
+        layer.style.opacity = "1";
+        await sleep(200);
+      }
+
+      sideRightFx.style.transition = "opacity 0.1s linear";
+      sideLeftFx.style.transition = "opacity 0.1s linear";
+      sideRightFx.style.opacity = "1";
+      sideLeftFx.style.opacity = "1";
+      await sleep(100);
+
+      zoneRight.style.transition = "opacity 0.1s linear";
+      zoneLeft.style.transition = "opacity 0.1s linear";
+      zoneRight.style.opacity = "1";
+      zoneLeft.style.opacity = "1";
+      await sleep(100);
+
+      resetSpaceOnionState();
+
+      blood03.style.transition = "opacity 0.5s ease-in";
+      blood03.style.opacity = "1";
+      await sleep(500);
+
+      blood04.style.transition = "opacity 0.5s ease-in";
+      blood04.style.opacity = "1";
+      await sleep(500);
+
+      backwardBusy = false;
+      animationPhase = 0;
+      updateButton();
+    }
+
+    // ===== 按鈕狀態更新 =====
+    function updateButton() {
+      if (animationPhase === 0) {
+        insertBtn.textContent = "插入";
+        insertBtn.classList.remove('pullout');
+      } else if (animationPhase === 1) {
+        insertBtn.textContent = "確定";
+        insertBtn.classList.remove('pullout');
+      } else if (animationPhase === 2) {
+        insertBtn.textContent = "拔出";
+        insertBtn.classList.add('pullout');
+      }
+    }
+
+    // ===== 更新顯示 =====
+    function updateAll() {
+      pantiesImg.style.opacity = pantiesRemoved ? "0" : "1";
+      stockingsImg.style.opacity = stockingsRemoved ? "0" : "1";
+      pussyImg.style.opacity = pantiesRemoved ? "1" : "0";
+    }
+    // ===== 粒子 =====
+    function createParticle(x, y, text) {
+      const p = document.createElement('div');
+      p.className = "particle";
+      p.style.left = x + "px";
+      p.style.top = y + "px";
+      p.textContent = text;
+      stage.appendChild(p);
+      setTimeout(() => {
+        p.style.transform = "translateY(-100px)";
+        p.style.opacity = "0";
+      }, 30);
+      setTimeout(() => p.remove(), 1600);
+    }
+    // ===== generic press =====
+    function resetPressLayers() {
+      pressSmall.style.opacity = "0";
+      pressMid.style.opacity = "0";
+      pressBig.style.opacity = "0";
+    }
+    async function playPressAnimation() {
+      if (pressRunning) return;
+      pressRunning = true;
+      resetPressLayers();
+      pressSmall.style.opacity = "1";
+      statusEl.textContent = "壓下 1";
+      await sleep(70);
+      if (isPressing) {
+        pressMid.style.opacity = "1";
+        statusEl.textContent = "壓下 2";
+        await sleep(70);
+      }
+      if (isPressing) {
+        pressBig.style.opacity = "1";
+        statusEl.textContent = "壓下 3";
+      }
+      while (isPressing) {
+        await sleep(30);
+      }
+      pressRunning = false;
+    }
+    function releasePress() {
+      isPressing = false;
+      resetPressLayers();
+      if (braRemoved) {
+        statusEl.textContent = "可按住互動區";
+      }
+    }
+    // ===== bra 切換 =====
+    async function crossfadeBraTo(nextIndex, clickX, clickY) {
+      if (braBusy || braRemoved) return;
+      braBusy = true;
+      const nextSrc = braList[nextIndex];
+      try {
+        await preloadAndDecode(nextSrc);
+        braFront.style.display = "block";
+        braBack.style.display = "block";
+        braBack.style.transition = "none";
+        braBack.src = nextSrc;
+        braBack.style.opacity = "1";
+        clearCanvas(braBack);
+        braBack.offsetHeight;
+        braFront.style.transition = "opacity 0.35s ease";
+        braBack.style.transition = "none";
+        requestAnimationFrame(() => {
+          braFront.style.opacity = "0";
+        });
+        setTimeout(() => {
+          const oldFront = braFront;
+          braFront = braBack;
+          braBack = oldFront;
+          braFront.style.display = "block";
+          braFront.style.opacity = "1";
+          braFront.style.transition = "none";
+          braBack.style.display = "block";
+          braBack.style.transition = "none";
+          braBack.style.opacity = "0";
+          braIndex = nextIndex;
+          braBusy = false;
+          const msg = "bra_" + braIndex;
+          statusEl.textContent = msg;
+          createParticle(clickX, clickY, msg);
+        }, 380);
+      } catch (err) {
+        console.log("圖片不存在:", nextSrc);
+        braBusy = false;
+      }
+    }
+    function removeBra(clickX, clickY) {
+      if (braBusy || braRemoved) return;
+      braBusy = true;
+      braFront.style.display = "block";
+      braBack.style.display = "block";
+      braFront.style.transition = "opacity 0.35s ease";
+      braBack.style.transition = "opacity 0.35s ease";
+      braFront.style.opacity = "0";
+      braBack.style.opacity = "0";
+      setTimeout(() => {
+        braRemoved = true;
+        braIndex = braList.length;
+        braFront.style.display = "none";
+        braBack.style.display = "none";
+        braBusy = false;
+        statusEl.textContent = "可按住互動區";
+        createParticle(clickX, clickY, "上層移除");
+      }, 380);
+    }
+    // ===== 一般點擊 =====
+    stage.addEventListener('click', (e) => {
+      const x = e.offsetX;
+      const y = e.offsetY;
+      if (!braRemoved && braIndex < braList.length && isHit(braFront, e.clientX, e.clientY)) {
+        if (braIndex >= braList.length - 1) {
+          removeBra(x, y);
+        } else {
+          crossfadeBraTo(braIndex + 1, x, y);
+        }
+        return;
+      }
+      if (!pantiesRemoved && isHit(pantiesImg, e.clientX, e.clientY)) {
+        pantiesRemoved = true;
+        pantiesImg.style.opacity = "0";
+        updateAll();
+        unlockAdvancedInteraction();
+        const msg = "下層移除";
+        statusEl.textContent = msg;
+        createParticle(x, y, msg);
+        return;
+      }
+      if (socksImg.style.display !== "none" && isHit(socksImg, e.clientX, e.clientY)) {
+        socksImg.style.opacity = "0";
+        setTimeout(() => {
+          socksImg.style.display = "none";
+        }, 200);
+        const msg = "襪子移除";
+        statusEl.textContent = msg;
+        createParticle(x, y, msg);
+        return;
+      }
+      if (!stockingsRemoved && isHit(stockingsImg, e.clientX, e.clientY)) {
+        stockingsRemoved = true;
+        stockingsImg.style.opacity = "0";
+        setTimeout(() => {
+          stockingsImg.style.display = "none";
+        }, 350);
+        pantiesImg.src = "panties_01.png";
+        clearCanvas(pantiesImg);
+        updateAll();
+        const msg = "絲襪移除";
+        statusEl.textContent = msg;
+        createParticle(x, y, msg);
+        return;
+      }
+      if (pussyImg.style.opacity === "1" && isHit(pussyImg, e.clientX, e.clientY)) {
+        pussyProgress++;
+        const msg = "點擊成功 " + pussyProgress;
+        statusEl.textContent = msg;
+        createParticle(x, y, msg);
+      }
+    });
+    // ===== 滑鼠長按 zone =====
+    stage.addEventListener('mousedown', (e) => {
+      if (braRemoved && !braBusy && isPressHit(e.clientX, e.clientY)) {
+        isPressing = true;
+        playPressAnimation();
+        return;
+      }
+
+      if (canUseAdvancedInteraction()) {
+        if (isHit(zoneRight, e.clientX, e.clientY, 10)) {
+          holdingSideRight = true;
+          playSideHoldForward('right');
+          return;
+        }
+        if (isHit(zoneLeft, e.clientX, e.clientY, 10)) {
+          holdingSideLeft = true;
+          playSideHoldForward('left');
+          return;
+        }
+      }
+    });
+
+    function releaseAllHolds() {
+      const wasHoldingRight = holdingSideRight;
+      const wasHoldingLeft = holdingSideLeft;
+
+      holdingSideRight = false;
+      holdingSideLeft = false;
+
+      if (wasHoldingRight) {
+        playSideHoldBackward('right');
+      }
+      if (wasHoldingLeft) {
+        playSideHoldBackward('left');
+      }
+
+      releasePress();
+    }
+
+    stage.addEventListener('mouseup', releaseAllHolds);
+    stage.addEventListener('mouseleave', releaseAllHolds);
+
+    // ===== 按鈕點擊主邏輯 =====
+    insertBtn.addEventListener('click', async () => {
+      if (!canUseAdvancedInteraction()) return;
+
+      if (animationPhase === 0) {
+        await playStage1Forward();
+      } else if (animationPhase === 1) {
+        animationPhase = 2;
+        updateButton();
+        startConfirmLoop();
+      } else if (animationPhase === 2) {
+        await playBackwardSequence();
+      }
+    });
+
+    // ===== 呼吸 =====
+    let breathOpacity = 0;
+    let increasing = true;
+    function smoothBreath() {
+      if (increasing) {
+        breathOpacity += 0.032;
+        if (breathOpacity >= 1) {
+          breathOpacity = 1;
+          increasing = false;
+        }
+      } else {
+        breathOpacity -= 0.032;
+        if (breathOpacity <= 0) {
+          breathOpacity = 0;
+          increasing = true;
+        }
+      }
+      bellyInhale.style.opacity = String(breathOpacity);
+    }
+    setInterval(smoothBreath, 80);
+
+    // ===== 眨眼 =====
+    function doBlink() {
+      eyeClosed.style.transition = "opacity 0.12s";
+      eyeClosed.style.opacity = "1";
+      setTimeout(() => {
+        eyeClosed.style.opacity = "0";
+      }, 180);
+    }
+    setInterval(() => {
+      if (Math.random() < 0.45) doBlink();
+    }, 3200);
 
     // ===== 手機觸控支援 =====
     function getTouchPos(e) {
@@ -230,8 +913,13 @@
     });
 
     // ===== 初始化 =====
-    // （你原本的 updateAll、releasePress、resetSideHoldState、resetSpaceOnionState、updateButton 等全部保留）
-    statusEl.textContent = "手機版已優化！人物變大、按鈕移到下方";
+    updateAll();
+    releasePress();
+    resetSideHoldState();
+    resetSpaceOnionState();
+    updateButton();
+
+    statusEl.textContent = "手機版已優化！人物變大、按鈕在下方";
   </script>
 </body>
 </html>
