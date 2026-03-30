@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>點擊圖層測試</title>
+  <title>抽插模擬器</title>
   <style>
     body {
       margin: 0;
@@ -213,10 +213,10 @@
     const oneTimeLayer = createLayer(groupBase, "one_time_layer.png", 35, 0);
     
     // ===== 血液圖層 =====
-    const blood01 = createLayer(groupBase, "blood_01.png", 36, 0);
-    const blood02 = createLayer(groupBase, "blood_02.png", 37, 0);
-    const blood03 = createLayer(groupBase, "blood_03.png", 41, 0);
-    const blood04 = createLayer(groupBase, "blood_04.png", 42, 0);
+    const blood01 = createLayer(groupBase, "blood_01.png", 36, 0);  // zone 之下
+    const blood02 = createLayer(groupBase, "blood_02.png", 37, 0);  // zone 之下
+    const blood03 = createLayer(groupBase, "blood_03.png", 41, 0);  // zone 上方（拔出後使用）
+    const blood04 = createLayer(groupBase, "blood_04.png", 42, 0);  // zone 上方（拔出後使用）
 
     const layer2 = createLayer(groupBase, "layer_02.png", 34, 0);
     const layer3 = createLayer(groupBase, "layer_03.png", 33, 0);
@@ -869,7 +869,8 @@
       }
       bellyInhale.style.opacity = String(breathOpacity);
     }
-    setInterval(smoothBreath, 55);
+    setInterval(smoothBreath, 80);   // 降低頻率，提升手機流暢度
+
     // ===== 眨眼 =====
     function doBlink() {
       eyeClosed.style.transition = "opacity 0.12s";
@@ -879,10 +880,10 @@
       }, 180);
     }
     setInterval(() => {
-      if (Math.random() < 0.6) doBlink();
-    }, 2600);
+      if (Math.random() < 0.45) doBlink();
+    }, 3200);   // 降低頻率，提升手機流暢度
 
-    // ===== 手機觸控支援 =====
+    // ===== 手機觸控完整支援 =====
     function getTouchPos(e) {
       const rect = stage.getBoundingClientRect();
       return {
@@ -894,11 +895,11 @@
     stage.addEventListener('touchstart', e => {
       if (e.touches.length === 1) {
         const pos = getTouchPos(e);
-        const fakeEvent = { 
-          clientX: pos.clientX, 
+        const fakeEvent = {
+          clientX: pos.clientX,
           clientY: pos.clientY,
-          offsetX: pos.clientX - stage.getBoundingClientRect().left,
-          offsetY: pos.clientY - stage.getBoundingClientRect().top 
+          offsetX: pos.clientX - rect.left,
+          offsetY: pos.clientY - rect.top
         };
         stage.dispatchEvent(new MouseEvent('mousedown', fakeEvent));
       }
@@ -918,6 +919,8 @@
     resetSideHoldState();
     resetSpaceOnionState();
     updateButton();
+
+    statusEl.textContent = "手機版已優化！請在手機上測試";
   </script>
 </body>
 </html>
